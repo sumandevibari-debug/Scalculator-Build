@@ -1,4 +1,4 @@
-name: Build APK (Docker Mode)
+name: Build APK (Official Kivy)
 on:
   push:
     branches: [ main ]
@@ -12,9 +12,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # This step downloads a "Perfect Computer" (Docker) to build your app
-      - name: Build with Buildozer Docker
-        uses: docker://kivymd/buildozer:latest
+      # Fix permissions so the robot can read your files
+      - name: Fix Permissions
+        run: sudo chown -R 1000:1000 .
+
+      # Use the OFFICIAL Kivy Builder (Not the broken one)
+      - name: Build with Kivy Docker
+        uses: docker://kivy/buildozer:latest
         with:
           args: buildozer android debug
 
