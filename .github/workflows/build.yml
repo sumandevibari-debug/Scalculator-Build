@@ -1,4 +1,4 @@
-name: Build APK (Official Kivy)
+name: Super Power Build
 on:
   push:
     branches: [ main ]
@@ -6,22 +6,59 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    
+    runs-on: ubuntu-22.04  # Using stable Ubuntu version
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Fix permissions so the robot can read your files
-      - name: Fix Permissions
-        run: sudo chown -R 1000:1000 .
+      # 1. CLEAR SPACE (Prevents 'Disk Full' errors)
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
 
-      # Use the OFFICIAL Kivy Builder (Not the broken one)
-      - name: Build with Kivy Docker
-        uses: docker://kivy/buildozer:latest
-        with:
-          args: buildozer android debug
+      # 2. INSTALL TOOLS (The Colab Setup)
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-pip build-essential git python3 python3-dev ffmpeg \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+            libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev \
+            libssl-dev zip unzip openjdk-17-jdk autoconf libtool pkg-config
 
+      # 3. FIX VERSION CONFLICTS (The 'Patch Failed' Fix)
+      - name: Install Buildozer & Cython
+        run: |
+          pip3 install --upgrade pip
+          pip3 install --user buildozer
+          # We pin Cython to this specific version to stop the Java Patch error
+          pip3 install cython==0.29.33
+
+      # 4. CONFIGURE BUILDOZER (Ensures settings are perfect)
+      - name: Force Config Settings
+        run: |
+          # If spec file exists, we edit it. If not, we make it.
+          export PATH=$PATH:~/.local/bin
+          if [ ! -f buildozer.spec ]; then buildozer init; fi
+          
+          # Force the correct Kivy version and permissions
+          sed -i 's/requirements = python3,kivy/requirements = python3,kivy==2.3.0/' buildozer.spec
+          sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
+          sed -i 's/title = My Application/title = Scalculator/' buildozer.spec
+          sed -i 's/package.name = myapp/package.name = scalculator/' buildozer.spec
+
+      # 5. BUILD THE APP (The 'Root Error' Fix)
+      - name: Build APK (Brute Force Mode)
+        run: |
+          export PATH=$PATH:~/.local/bin
+          # The 'yes' command answers "y" to "Run as root?" and "Accept License?"
+          yes | buildozer android debug
+
+      # 6. UPLOAD
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
